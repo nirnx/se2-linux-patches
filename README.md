@@ -22,7 +22,9 @@ not recognised, it changes nothing.
   - [Undo / check](#undo--check)
   - [Manual mode](#manual-mode)
 - [1. Ray tracing and DLSS are greyed out](#1-ray-tracing-and-dlss-are-greyed-out)
+  - [How it could be fixed upstream](#how-it-could-be-fixed-upstream)
 - [2. False "Low Memory Detected" warning](#2-false-low-memory-detected-warning)
+  - [How it could be fixed upstream](#how-it-could-be-fixed-upstream-1)
 - [Notes](#notes)
 - [License](#license)
 
@@ -96,6 +98,21 @@ and `DLSS: NGX runtime probe succeeded`.
 The game also uses the clock to estimate the GPU's TFLOPS for its default quality preset. That
 estimate now uses the current clock instead of the boost clock.
 
+### How it could be fixed upstream
+
+Any one of these would make the patch unnecessary.
+
+- **Keen (game):** in `NvApiWrapper.dll`, query the RTX core count (`NvAPI_GPU_GetGPUInfo`) even
+  when the clock query fails. The clock is only used for the TFLOPS estimate, and the game
+  already handles an unknown TFLOPS value. Alternatively, fall back to the `CURRENT` clock when
+  `BOOST` returns `NVAPI_NOT_SUPPORTED`.
+- **dxvk-nvapi:** support `BOOST` (and `BASE`) in `NvAPI_GPU_GetAllClockFrequencies`, for example
+  by mapping `BOOST` to NVML's maximum clock (`nvmlDeviceGetMaxClockInfo`). Today it returns
+  `NVAPI_NOT_SUPPORTED` for any clock type except `CURRENT` (`src/nvapi_gpu.cpp`).
+- **Proton (Valve):** ship wine-nvml, as GE-Proton does. Without NVML, dxvk-nvapi cannot report
+  clocks at all, so a dxvk-nvapi fix would also need this.
+- **Wine:** not involved.
+
 ## 2. False "Low Memory Detected" warning
 
 **Symptom.** The main menu shows "Low Memory Detected", no matter how much RAM and swap you have.
@@ -122,6 +139,21 @@ drops a `Math.Max(0, vram)` call, which never changes the result.
 
 This assembly ships precompiled (ReadyToRun), so the launch option is **required**. Without it
 .NET runs the precompiled code and ignores the patch. It only makes .NET JIT this one assembly.
+
+### How it could be fixed upstream
+
+- **Keen (game):** skip the pagefile check under Wine. The game already detects Wine
+  (`CrashReporter.IsRunningWine()`) and uses that elsewhere since build 4.0.0.3165. If Keen
+  wants a warning on Linux too, it could read `SwapTotal` from `/proc/meminfo` (visible to the
+  game as `Z:\proc\meminfo`) instead. Separately, `TryGetSwapConfiguration` could accept a
+  `REG_SZ` value as well as `REG_MULTI_SZ`.
+- **Wine:** `wine.inf` creates the value as `REG_SZ`
+  (`PagingFiles,,"%24%\pagefile.sys 27 77"`); Windows uses `REG_MULTI_SZ`. Changing the type
+  alone would not be enough here, because 27–77 MB is still far below what the game asks for.
+  The entry would also have to look like a system-managed pagefile (for example
+  `?:\pagefile.sys`).
+- **Proton (Valve):** same as Wine, in the prefix Proton creates, or as a per-game registry fix.
+- **dxvk-nvapi:** not involved.
 
 ## Notes
 
