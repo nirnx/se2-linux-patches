@@ -103,9 +103,11 @@ estimate now uses the current clock instead of the boost clock.
 Any one of these would make the patch unnecessary.
 
 - **Keen (game):** in `NvApiWrapper.dll`, query the RTX core count (`NvAPI_GPU_GetGPUInfo`) even
-  when the clock query fails. The clock is only used for the TFLOPS estimate, and the game
-  already handles an unknown TFLOPS value. Alternatively, fall back to the `CURRENT` clock when
-  `BOOST` returns `NVAPI_NOT_SUPPORTED`.
+  when the clock query fails, and report TFLOPS as unknown (`null`) instead of 0 in that case.
+  The clock is only used for the TFLOPS estimate, and the minimum-requirements check already
+  treats a missing TFLOPS value as OK (a value of 0 fails it). This works on any Proton, even
+  without NVML. In addition, falling back to the `CURRENT` clock when `BOOST` returns
+  `NVAPI_NOT_SUPPORTED` keeps the TFLOPS estimate working where NVML is available.
 - **dxvk-nvapi:** support `BOOST` (and `BASE`) in `NvAPI_GPU_GetAllClockFrequencies`, for example
   by mapping `BOOST` to NVML's maximum clock (`nvmlDeviceGetMaxClockInfo`). Today it returns
   `NVAPI_NOT_SUPPORTED` for any clock type except `CURRENT` (`src/nvapi_gpu.cpp`).
@@ -143,7 +145,8 @@ This assembly ships precompiled (ReadyToRun), so the launch option is **required
 ### How it could be fixed upstream
 
 - **Keen (game):** skip the pagefile check under Wine. The game already detects Wine
-  (`CrashReporter.IsRunningWine()`) and uses that elsewhere since build 4.0.0.3165. If Keen
+  (`PlatformCore.CrashReporter.IsVirtualProcess()`, which wraps `IsRunningWine()`) and uses it in
+  `DeviceWrap` since build 4.0.0.3165. If Keen
   wants a warning on Linux too, it could read `SwapTotal` from `/proc/meminfo` (visible to the
   game as `Z:\proc\meminfo`) instead. Separately, `TryGetSwapConfiguration` could accept a
   `REG_SZ` value as well as `REG_MULTI_SZ`.
