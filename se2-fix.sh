@@ -19,7 +19,15 @@ set -euo pipefail
 
 LAUNCH_OPTIONS='DOTNET_ReadyToRunExcludeList=VRage.Platform.Windows %command%'
 
-die() { echo "ERROR: $*" >&2; exit 1; }
+# Colours only on a terminal, and never when NO_COLOR is set (https://no-color.org).
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+    BOLD=$'\e[1m' DIM=$'\e[2m' RED=$'\e[31m' GREEN=$'\e[32m' YELLOW=$'\e[33m' CYAN=$'\e[36m' RESET=$'\e[0m'
+else
+    BOLD="" DIM="" RED="" GREEN="" YELLOW="" CYAN="" RESET=""
+fi
+
+die() { echo "${RED}${BOLD}ERROR:${RESET}${RED} $*${RESET}" >&2; exit 1; }
+say() { echo "  $1  ${BOLD}$2${RESET}: $3${RESET}"; }   # icon name message
 
 find_game_dir() {
     local root vdf lib
@@ -177,7 +185,8 @@ if pgrep -f 'SpaceEngineers2\.exe' >/dev/null 2>&1; then
     die "Space Engineers 2 is running. Close it first."
 fi
 
-echo "Game2: $game2"
+echo "${BOLD}${CYAN}Space Engineers 2 Linux patches${RESET}"
+echo "${DIM}Game2: $game2${RESET}"
 changed=0
 for fix in NV MEM; do
     file_var="${fix}_FILE" name_var="${fix}_NAME"
@@ -188,36 +197,40 @@ for fix in NV MEM; do
 
     case "$mode" in
         status)
-            backup="none"
+            backup="${DIM}none"
             if [[ -f "$file.orig" ]]; then
                 if [[ "$state" == "patched" ]] && backup_matches "$fix" "$file"; then
-                    backup="valid"
+                    backup="${GREEN}valid"
                 else
-                    backup="stale (from another game build, ignored)"
+                    backup="${YELLOW}stale (from another game build, ignored)"
                 fi
             fi
-            echo "  $name: $state, backup: $backup"
+            case "$state" in
+                patched)  say "${GREEN}●${RESET}" "$name" "${GREEN}patched${RESET}, backup: $backup" ;;
+                original) say "${YELLOW}○${RESET}" "$name" "${YELLOW}not patched${RESET}, backup: $backup" ;;
+                *)        say "${RED}?${RESET}" "$name" "${RED}code not recognised${RESET}, backup: $backup" ;;
+            esac
             ;;
         restore)
             if [[ "$state" == "original" ]]; then
-                echo "  $name: already original"
+                say "${DIM}○${RESET}" "$name" "${DIM}already original"
                 rm -f "$file.orig"
             elif [[ "$state" == "patched" ]] && backup_matches "$fix" "$file"; then
                 cp -p "$file.orig" "$file"
                 rm -f "$file.orig"
-                echo "  $name: restored"
+                say "${GREEN}✔${RESET}" "$name" "${GREEN}restored"
                 changed=1
             else
-                echo "  $name: no matching backup. Use Steam's 'Verify integrity of game files'."
+                say "${RED}✘${RESET}" "$name" "${RED}no matching backup.${RESET} Use Steam's 'Verify integrity of game files'."
             fi
             ;;
         apply)
             if [[ "$state" == "patched" ]]; then
-                echo "  $name: already patched"
+                say "${GREEN}●${RESET}" "$name" "${DIM}already patched"
                 continue
             fi
             if [[ "$state" != "original" ]]; then
-                echo "  $name: SKIPPED - code not recognised (Keen may have changed or fixed it)."
+                say "${YELLOW}⚠${RESET}" "$name" "${YELLOW}skipped: code not recognised (Keen may have changed or fixed it)"
                 continue
             fi
             tmp="$file.tmp.$$"
@@ -228,7 +241,7 @@ for fix in NV MEM; do
             cp -p "$file" "$file.orig"
             mv "$tmp" "$file"
             trap - EXIT
-            echo "  $name: patched (original saved as ${!file_var}.orig)"
+            say "${GREEN}✔${RESET}" "$name" "${GREEN}patched${RESET} ${DIM}(original saved as ${!file_var}.orig)"
             changed=1
             ;;
     esac
@@ -238,16 +251,18 @@ case "$mode" in
     apply)
         cat <<EOF
 
-In Steam: right-click Space Engineers 2 -> Properties -> General, and put this in
-"Launch Options" (needed for the Low Memory fix):
+${BOLD}Next steps in Steam${RESET} (right-click Space Engineers 2 -> Properties):
 
-    $LAUNCH_OPTIONS
+  ${BOLD}1.${RESET} General -> Launch Options ${DIM}(needed for the Low Memory fix)${RESET}:
 
-For ray tracing / DLSS on NVIDIA also select GE-Proton 11 (or newer) under
-Properties -> Compatibility. It ships wine-nvml, which the fix needs.
+        ${CYAN}${BOLD}$LAUNCH_OPTIONS${RESET}
+
+  ${BOLD}2.${RESET} NVIDIA, for ray tracing / DLSS: Compatibility -> ${CYAN}${BOLD}GE-Proton 11${RESET} or newer
+     ${DIM}(it ships wine-nvml, which the fix needs)${RESET}
 EOF
         ;;
     restore)
-        [[ $changed -eq 0 ]] || echo "Remove the DOTNET_ReadyToRunExcludeList launch option in Steam."
+        [[ $changed -eq 0 ]] || echo "
+${YELLOW}Remove the ${BOLD}DOTNET_ReadyToRunExcludeList${RESET}${YELLOW} launch option in Steam.${RESET}"
         ;;
 esac
