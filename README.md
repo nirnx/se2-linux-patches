@@ -31,7 +31,7 @@ not recognised, it changes nothing.
 **1.** Close the game. Open a terminal (on the Steam Deck: Desktop Mode → Konsole) and run:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nirnx/se2-proton-fixes/main/se2-fix.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nirnx/se2-linux-patches/main/se2-fix.sh | bash
 ```
 
 **2.** In Steam, right-click **Space Engineers 2** → **Properties** → **General**, and put this in
@@ -50,8 +50,8 @@ Tested on build 4.0.0.3165 with an RTX 5090 (driver 615.78) and GE-Proton11-11.
 ### Undo / check
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nirnx/se2-proton-fixes/main/se2-fix.sh | bash -s -- --restore
-curl -fsSL https://raw.githubusercontent.com/nirnx/se2-proton-fixes/main/se2-fix.sh | bash -s -- --status
+curl -fsSL https://raw.githubusercontent.com/nirnx/se2-linux-patches/main/se2-fix.sh | bash -s -- --restore
+curl -fsSL https://raw.githubusercontent.com/nirnx/se2-linux-patches/main/se2-fix.sh | bash -s -- --status
 ```
 
 ### Manual mode
